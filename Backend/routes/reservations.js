@@ -316,12 +316,20 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Update reservation status to cancelled
-    reservation.status = "Cancelled";
-    await reservation.save();
+    // Check if reservation can be cancelled (not in the past)
+    const now = new Date();
+    const reservationDate = new Date(reservation.date);
+    if (reservationDate < now) {
+      return res.status(400).json({ error: "Cannot cancel past reservations" });
+    }
+
+    // Instead of updating status to cancelled, delete the reservation
+    // This prevents index conflicts and cleans up the database
+    await Reservation.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Reservation cancelled successfully" });
   } catch (err) {
+    console.error("Cancellation error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -358,6 +366,69 @@ router.get("/available-slots/:seatId/:date", auth, async (req, res) => {
     );
 
     res.json({ availableSlots });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual Assignment (Admin only)
+router.post("/manual-assign", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Access denied. Admin only." });
+    }
+
+    const { seatId, internEmail, date, timeSlot } = req.body;
+
+    // Find the intern by email
+    const User = require("../models/user");
+    const intern = await User.findOne({ email: internEmail, role: "intern" });
+    if (!intern) {
+      return res
+        .status(404)
+        .json({ error: "Intern not found with this email" });
+    }
+
+    // Validate seat exists and is available
+    const seat = await Seat.findById(seatId);
+    if (!seat) {
+      return res.status(404).json({ error: "Seat not found" });
+    }
+
+    // Check if seat is available for the given date and time slot
+    const existingReservation = await Reservation.findOne({
+      seatId,
+      date: new Date(date),
+      timeSlot,
+      status: "Active",
+    });
+
+    if (existingReservation) {
+      return res.status(400).json({
+        error:
+          "This seat is already reserved for the specified date and time slot",
+      });
+    }
+
+    // Create the reservation
+    const reservation = await Reservation.create({
+      userId: intern._id,
+      seatId,
+      date: new Date(date),
+      timeSlot,
+      status: "Active",
+    });
+
+    // Populate the reservation with user and seat details
+    const populatedReservation = await Reservation.findById(reservation._id)
+      .populate("userId", "name email role")
+      .populate("seatId", "seatNumber row location area");
+
+    res.status(201).json({
+      message: "Seat assigned successfully",
+      reservation: populatedReservation,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

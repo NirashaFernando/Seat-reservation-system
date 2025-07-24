@@ -51,13 +51,15 @@ export const seatsAPI = {
     return api.get(`/seats?${params.toString()}`);
   },
   getByArea: (area) => api.get(`/seats?area=${area}`),
+  create: (seatData) => api.post("/seats", seatData),
   updateSeat: (id, data) => api.put(`/seats/${id}`, data),
+  delete: (id) => api.delete(`/seats/${id}`),
   getSeatStats: () => api.get("/seats/stats"),
 };
 
 // Reservations APIs
 export const reservationsAPI = {
-  getAll: () => api.get("/reservations"),
+  getAll: () => api.get("/reservations/all"),
   getUserReservations: () => api.get("/reservations/my"),
   getCurrentReservations: () => api.get("/reservations/my/current"),
   getPastReservations: () => api.get("/reservations/my/past"),
@@ -66,6 +68,8 @@ export const reservationsAPI = {
   cancel: (id) => api.delete(`/reservations/${id}`),
   getUpcoming: () => api.get("/reservations/upcoming"),
   getHistory: () => api.get("/reservations/history"),
+  manualAssign: (assignmentData) =>
+    api.post("/reservations/manual-assign", assignmentData),
 };
 
 // Utility functions

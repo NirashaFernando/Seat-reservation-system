@@ -1,24 +1,42 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Container,
+  Stack,
+  IconButton,
+  CircularProgress,
+} from "@mui/material";
+import {
+  AdminPanelSettings,
+  ArrowBack,
+  Login,
+  Email,
+  Lock,
+} from "@mui/icons-material";
 
 const AdminAuth = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    name: "",
-    adminKey: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((prevState) => ({
+      ...prevState,
+      [name]: value,
+    }));
     setError("");
   };
 
@@ -28,14 +46,9 @@ const AdminAuth = () => {
     setError("");
 
     try {
-      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-      const data = isLogin
-        ? { email: formData.email, password: formData.password }
-        : { ...formData, role: "admin" };
-
       const response = await axios.post(
-        `http://localhost:5000${endpoint}`,
-        data
+        "http://localhost:5000/api/auth/login",
+        { email: formData.email, password: formData.password }
       );
 
       if (response.data.token) {
@@ -51,157 +64,140 @@ const AdminAuth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <button
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Box sx={{ mb: 3 }}>
+          <IconButton
             onClick={() => navigate("/")}
-            className="flex items-center text-blue-600 hover:text-blue-800 mb-6"
+            sx={{
+              color: "primary.main",
+              "&:hover": { backgroundColor: "primary.light" },
+            }}
           >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="body2"
+            color="primary.dark"
+            sx={{ ml: 1, display: "inline" }}
+          >
             Back to Home
-          </button>
+          </Typography>
+        </Box>
 
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900">
-              Admin {isLogin ? "Sign In" : "Register"}
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {isLogin
-                ? "Access the admin dashboard"
-                : "Create a new admin account"}
-            </p>
-          </div>
-        </div>
+        <Card
+          elevation={8}
+          sx={{
+            borderRadius: 3,
+            overflow: "hidden",
+            backdropFilter: "blur(10px)",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              background: "linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)",
+              color: "white",
+              p: 3,
+              textAlign: "center",
+            }}
+          >
+            <AdminPanelSettings sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h4" component="h1" fontWeight="bold">
+              Admin Login
+            </Typography>
+            <Typography variant="body1" sx={{ opacity: 0.9 }}>
+              Administrative dashboard access
+            </Typography>
+          </Box>
 
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <CardContent sx={{ p: 4 }}>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
-              </div>
+              </Alert>
             )}
 
-            {!isLogin && (
-              <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required={!isLogin}
-                  value={formData.name}
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={3}>
+                <TextField
+                  name="email"
+                  type="email"
+                  label="Email Address"
+                  value={formData.email}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your full name"
+                  required
+                  fullWidth
+                  variant="outlined"
+                  autoComplete="email"
+                  InputProps={{
+                    startAdornment: (
+                      <Email sx={{ mr: 1, color: "action.active" }} />
+                    ),
+                  }}
                 />
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email Address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your password"
-              />
-            </div>
-
-            {!isLogin && (
-              <div>
-                <label
-                  htmlFor="adminKey"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Admin Key
-                </label>
-                <input
-                  id="adminKey"
-                  name="adminKey"
+                <TextField
+                  name="password"
                   type="password"
-                  required={!isLogin}
-                  value={formData.adminKey}
+                  label="Password"
+                  value={formData.password}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter admin key"
+                  required
+                  fullWidth
+                  variant="outlined"
+                  autoComplete="current-password"
+                  InputProps={{
+                    startAdornment: (
+                      <Lock sx={{ mr: 1, color: "action.active" }} />
+                    ),
+                  }}
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Contact your system administrator for the admin key
-                </p>
-              </div>
-            )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "Processing..." : isLogin ? "Sign In" : "Register"}
-              </button>
-            </div>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                {isLogin
-                  ? "Don't have an account? Register here"
-                  : "Already have an account? Sign in here"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
+                  sx={{
+                    mt: 4,
+                    py: 2,
+                    fontSize: "1.1rem",
+                    fontWeight: "bold",
+                    textTransform: "none",
+                    background:
+                      "linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)",
+                    "&:hover": {
+                      background:
+                        "linear-gradient(45deg, #1565c0 30%, #1976d2 90%)",
+                    },
+                  }}
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      <Login />
+                    )
+                  }
+                >
+                  {loading ? "Signing In..." : "Sign In"}
+                </Button>
+              </Stack>
+            </form>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 };
 

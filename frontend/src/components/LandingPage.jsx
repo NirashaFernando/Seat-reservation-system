@@ -1,70 +1,124 @@
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Container,
+  Stack,
+} from "@mui/material";
+import { AdminPanelSettings, Person, EventSeat } from "@mui/icons-material";
 
 const LandingPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-2xl p-12 max-w-md w-full mx-4">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Seat Reservation System
-          </h1>
-          <p className="text-gray-600">
-            Welcome! Please select your role to continue
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <button
-            onClick={() => navigate("/admin/auth")}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-300 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card
+          elevation={8}
+          sx={{
+            borderRadius: 3,
+            overflow: "hidden",
+            backdropFilter: "blur(10px)",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+          }}
+        >
+          <CardContent sx={{ p: 6 }}>
+            <Box sx={{ textAlign: "center", mb: 4 }}>
+              <EventSeat
+                sx={{
+                  fontSize: 64,
+                  color: "primary.main",
+                  mb: 2,
+                }}
               />
-            </svg>
-            <span>Admin Login</span>
-          </button>
+              <Typography
+                variant="h3"
+                component="h1"
+                fontWeight="bold"
+                color="text.primary"
+                gutterBottom
+              >
+                Seat Reservation System
+              </Typography>
+              <Typography
+                variant="h6"
+                color="text.secondary"
+                sx={{ maxWidth: 400, mx: "auto" }}
+              >
+                Welcome! Please select your role to continue
+              </Typography>
+            </Box>
 
-          <button
-            onClick={() => navigate("/intern/auth")}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-300 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
-            <span>Intern Login</span>
-          </button>
-        </div>
+            <Stack spacing={3}>
+              <Button
+                onClick={() => navigate("/admin/auth")}
+                variant="contained"
+                size="large"
+                fullWidth
+                startIcon={<AdminPanelSettings />}
+                sx={{
+                  py: 2,
+                  fontSize: "1.1rem",
+                  fontWeight: "bold",
+                  textTransform: "none",
+                  background:
+                    "linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)",
+                  boxShadow: "0 4px 15px rgba(25, 118, 210, 0.3)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(45deg, #1565c0 30%, #1976d2 90%)",
+                    boxShadow: "0 6px 20px rgba(25, 118, 210, 0.4)",
+                    transform: "translateY(-2px)",
+                  },
+                  transition: "all 0.3s ease-in-out",
+                }}
+              >
+                Admin Login
+              </Button>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
-            New user? Registration forms will be available after selecting your
-            role.
-          </p>
-        </div>
-      </div>
-    </div>
+              <Button
+                onClick={() => navigate("/intern/auth")}
+                variant="contained"
+                size="large"
+                fullWidth
+                startIcon={<Person />}
+                sx={{
+                  py: 2,
+                  fontSize: "1.1rem",
+                  fontWeight: "bold",
+                  textTransform: "none",
+                  background:
+                    "linear-gradient(45deg, #388e3c 30%, #66bb6a 90%)",
+                  boxShadow: "0 4px 15px rgba(56, 142, 60, 0.3)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(45deg, #2e7d32 30%, #388e3c 90%)",
+                    boxShadow: "0 6px 20px rgba(56, 142, 60, 0.4)",
+                    transform: "translateY(-2px)",
+                  },
+                  transition: "all 0.3s ease-in-out",
+                }}
+              >
+                Intern Login
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 };
 

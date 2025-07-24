@@ -1,10 +1,42 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Container,
+  Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  IconButton,
+  Tabs,
+  Tab,
+  CircularProgress,
+} from "@mui/material";
+import {
+  Person,
+  ArrowBack,
+  Login,
+  PersonAdd,
+  Email,
+  Lock,
+  Business,
+} from "@mui/icons-material";
 
 const InternAuth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({
+  const [activeTab, setActiveTab] = useState(0); // 0 for login, 1 for register
+  const [loginData, setLoginData] = useState({
+    email: "",
+    password: "",
+  });
+  const [registerData, setRegisterData] = useState({
     email: "",
     password: "",
     name: "",
@@ -27,11 +59,21 @@ const InternAuth = () => {
     "Other",
   ];
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleLoginChange = (e) => {
+    const { name, value } = e.target;
+    setLoginData((prevState) => ({
+      ...prevState,
+      [name]: value,
+    }));
+    setError("");
+  };
+
+  const handleRegisterChange = (e) => {
+    const { name, value } = e.target;
+    setRegisterData((prevState) => ({
+      ...prevState,
+      [name]: value,
+    }));
     setError("");
   };
 
@@ -41,10 +83,11 @@ const InternAuth = () => {
     setError("");
 
     try {
+      const isLogin = activeTab === 0;
       const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
       const data = isLogin
-        ? { email: formData.email, password: formData.password }
-        : { ...formData, role: "intern" };
+        ? { email: loginData.email, password: loginData.password }
+        : { ...registerData, role: "intern" };
 
       const response = await axios.post(
         `http://localhost:5000${endpoint}`,
@@ -64,159 +107,245 @@ const InternAuth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <button
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Box sx={{ mb: 3 }}>
+          <IconButton
             onClick={() => navigate("/")}
-            className="flex items-center text-green-600 hover:text-green-800 mb-6"
+            sx={{
+              color: "success.main",
+              "&:hover": { backgroundColor: "success.light" },
+            }}
           >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="body2"
+            color="success.dark"
+            sx={{ ml: 1, display: "inline" }}
+          >
             Back to Home
-          </button>
+          </Typography>
+        </Box>
 
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900">
-              Intern {isLogin ? "Sign In" : "Register"}
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {isLogin
-                ? "Access your seat reservation dashboard"
-                : "Create a new intern account"}
-            </p>
-          </div>
-        </div>
+        <Card
+          elevation={8}
+          sx={{
+            borderRadius: 3,
+            overflow: "hidden",
+            backdropFilter: "blur(10px)",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              background: "linear-gradient(45deg, #388e3c 30%, #66bb6a 90%)",
+              color: "white",
+              p: 3,
+              textAlign: "center",
+            }}
+          >
+            <Person sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h4" component="h1" fontWeight="bold">
+              Intern Portal
+            </Typography>
+            <Typography variant="body1" sx={{ opacity: 0.9 }}>
+              Access your seat reservation dashboard
+            </Typography>
+          </Box>
 
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          {/* Tabs */}
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs
+              value={activeTab}
+              onChange={(e, newValue) => setActiveTab(newValue)}
+              variant="fullWidth"
+            >
+              <Tab
+                label="Sign In"
+                icon={<Login />}
+                iconPosition="start"
+                sx={{ textTransform: "none", fontSize: "1rem" }}
+              />
+              <Tab
+                label="Register"
+                icon={<PersonAdd />}
+                iconPosition="start"
+                sx={{ textTransform: "none", fontSize: "1rem" }}
+              />
+            </Tabs>
+          </Box>
+
+          <CardContent sx={{ p: 4 }}>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
-              </div>
+              </Alert>
             )}
 
-            {!isLogin && (
-              <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required={!isLogin}
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                  placeholder="Enter your full name"
-                />
-              </div>
-            )}
+            <form onSubmit={handleSubmit}>
+              {/* Login Form */}
+              {activeTab === 0 && (
+                <Box sx={{ py: 3 }}>
+                  <Stack spacing={3}>
+                    <TextField
+                      name="email"
+                      type="email"
+                      label="Email Address"
+                      value={loginData.email}
+                      onChange={handleLoginChange}
+                      required
+                      fullWidth
+                      variant="outlined"
+                      autoComplete="email"
+                      InputProps={{
+                        startAdornment: (
+                          <Email sx={{ mr: 1, color: "action.active" }} />
+                        ),
+                      }}
+                    />
+                    <TextField
+                      name="password"
+                      type="password"
+                      label="Password"
+                      value={loginData.password}
+                      onChange={handleLoginChange}
+                      required
+                      fullWidth
+                      variant="outlined"
+                      autoComplete="current-password"
+                      InputProps={{
+                        startAdornment: (
+                          <Lock sx={{ mr: 1, color: "action.active" }} />
+                        ),
+                      }}
+                    />
+                  </Stack>
+                </Box>
+              )}
 
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email Address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                placeholder="Enter your email"
-              />
-            </div>
+              {/* Register Form */}
+              {activeTab === 1 && (
+                <Box sx={{ py: 3 }}>
+                  <Stack spacing={3}>
+                    <TextField
+                      name="name"
+                      type="text"
+                      label="Full Name"
+                      value={registerData.name}
+                      onChange={handleRegisterChange}
+                      required
+                      fullWidth
+                      variant="outlined"
+                      autoComplete="name"
+                      InputProps={{
+                        startAdornment: (
+                          <Person sx={{ mr: 1, color: "action.active" }} />
+                        ),
+                      }}
+                    />
+                    <TextField
+                      name="email"
+                      type="email"
+                      label="Email Address"
+                      value={registerData.email}
+                      onChange={handleRegisterChange}
+                      required
+                      fullWidth
+                      variant="outlined"
+                      autoComplete="email"
+                      InputProps={{
+                        startAdornment: (
+                          <Email sx={{ mr: 1, color: "action.active" }} />
+                        ),
+                      }}
+                    />
+                    <TextField
+                      name="password"
+                      type="password"
+                      label="Password"
+                      value={registerData.password}
+                      onChange={handleRegisterChange}
+                      required
+                      fullWidth
+                      variant="outlined"
+                      autoComplete="new-password"
+                      InputProps={{
+                        startAdornment: (
+                          <Lock sx={{ mr: 1, color: "action.active" }} />
+                        ),
+                      }}
+                    />
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel>Department</InputLabel>
+                      <Select
+                        name="department"
+                        value={registerData.department}
+                        onChange={handleRegisterChange}
+                        required
+                        label="Department"
+                      >
+                        {departments.map((dept) => (
+                          <MenuItem key={dept} value={dept}>
+                            {dept}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Stack>
+                </Box>
+              )}
 
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                placeholder="Enter your password"
-              />
-            </div>
-
-            {!isLogin && (
-              <div>
-                <label
-                  htmlFor="department"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Department
-                </label>
-                <select
-                  id="department"
-                  name="department"
-                  required={!isLogin}
-                  value={formData.department}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">Select your department</option>
-                  {departments.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div>
-              <button
+              <Button
                 type="submit"
+                fullWidth
+                variant="contained"
+                size="large"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                sx={{
+                  mt: 4,
+                  py: 2,
+                  fontSize: "1.1rem",
+                  fontWeight: "bold",
+                  textTransform: "none",
+                  background:
+                    "linear-gradient(45deg, #388e3c 30%, #66bb6a 90%)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(45deg, #2e7d32 30%, #388e3c 90%)",
+                  },
+                }}
+                startIcon={
+                  loading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : activeTab === 0 ? (
+                    <Login />
+                  ) : (
+                    <PersonAdd />
+                  )
+                }
               >
-                {loading ? "Processing..." : isLogin ? "Sign In" : "Register"}
-              </button>
-            </div>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-sm text-green-600 hover:text-green-800"
-              >
-                {isLogin
-                  ? "Don't have an account? Register here"
-                  : "Already have an account? Sign in here"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+                {loading
+                  ? "Processing..."
+                  : activeTab === 0
+                  ? "Sign In"
+                  : "Register"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 };
 

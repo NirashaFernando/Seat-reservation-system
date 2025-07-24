@@ -1,6 +1,30 @@
 import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Container,
+  Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+} from "@mui/material";
+import {
+  PersonAdd,
+  Person,
+  Email,
+  Lock,
+  Business,
+  EventSeat,
+} from "@mui/icons-material";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -17,10 +41,11 @@ const Register = () => {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((prevState) => ({
+      ...prevState,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -51,143 +76,168 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Register for Seat Reservation System
-          </h2>
-        </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card
+          elevation={8}
+          sx={{
+            borderRadius: 3,
+            overflow: "hidden",
+            backdropFilter: "blur(10px)",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              background: "linear-gradient(45deg, #424242 30%, #757575 90%)",
+              color: "white",
+              p: 3,
+              textAlign: "center",
+            }}
+          >
+            <EventSeat sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h4" component="h1" fontWeight="bold">
+              Create Account
+            </Typography>
+            <Typography variant="body1" sx={{ opacity: 0.9 }}>
+              Join the Seat Reservation System
+            </Typography>
+          </Box>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-            {error}
-          </div>
-        )}
+          <CardContent sx={{ p: 4 }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Full Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Enter your full name"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email Address
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="role"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-              >
-                <option value="intern">Intern</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Enter your password"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Confirm your password"
-              />
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Registering..." : "Register"}
-            </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{" "}
-              <a
-                href="/login"
-                className="font-medium text-primary-600 hover:text-primary-500"
-              >
-                Login here
-              </a>
-            </p>
-          </div>
-        </form>
-      </div>
-    </div>
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={3}>
+                <TextField
+                  name="name"
+                  type="text"
+                  label="Full Name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  fullWidth
+                  variant="outlined"
+                  autoComplete="name"
+                  InputProps={{
+                    startAdornment: (
+                      <Person sx={{ mr: 1, color: "action.active" }} />
+                    ),
+                  }}
+                />
+                <TextField
+                  name="email"
+                  type="email"
+                  label="Email Address"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  fullWidth
+                  variant="outlined"
+                  autoComplete="email"
+                  InputProps={{
+                    startAdornment: (
+                      <Email sx={{ mr: 1, color: "action.active" }} />
+                    ),
+                  }}
+                />
+                <TextField
+                  name="password"
+                  type="password"
+                  label="Password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  fullWidth
+                  variant="outlined"
+                  autoComplete="new-password"
+                  InputProps={{
+                    startAdornment: (
+                      <Lock sx={{ mr: 1, color: "action.active" }} />
+                    ),
+                  }}
+                />
+                <TextField
+                  name="confirmPassword"
+                  type="password"
+                  label="Confirm Password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  fullWidth
+                  variant="outlined"
+                  autoComplete="new-password"
+                  InputProps={{
+                    startAdornment: (
+                      <Lock sx={{ mr: 1, color: "action.active" }} />
+                    ),
+                  }}
+                />{" "}
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel>Role</InputLabel>
+                  <Select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    required
+                    label="Role"
+                    startAdornment={
+                      <Business sx={{ mr: 1, color: "action.active" }} />
+                    }
+                  >
+                    <MenuItem value="intern">Intern</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
+                  sx={{
+                    mt: 4,
+                    py: 2,
+                    fontSize: "1.1rem",
+                    fontWeight: "bold",
+                    textTransform: "none",
+                    background:
+                      "linear-gradient(45deg, #424242 30%, #757575 90%)",
+                    "&:hover": {
+                      background:
+                        "linear-gradient(45deg, #303030 30%, #424242 90%)",
+                    },
+                  }}
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      <PersonAdd />
+                    )
+                  }
+                >
+                  {loading ? "Creating Account..." : "Create Account"}
+                </Button>
+              </Stack>
+            </form>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 };
 

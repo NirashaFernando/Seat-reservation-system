@@ -109,6 +109,18 @@ const InternDashboard = () => {
   const [success, setSuccess] = useState("");
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
+  // Function to group seats by floor/area
+  const groupSeatsByArea = (seats) => {
+    return seats.reduce((groups, seat) => {
+      const area = seat.area || "Unknown";
+      if (!groups[area]) {
+        groups[area] = [];
+      }
+      groups[area].push(seat);
+      return groups;
+    }, {});
+  };
+
   // Validation functions
   const validateBooking = () => {
     // Check if date is selected
@@ -142,23 +154,28 @@ const InternDashboard = () => {
       const now = new Date();
       const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
       const currentHour = oneHourFromNow.getHours();
-      
-      if (currentHour >= 18) { // After 6 PM
-        setError("Seats must be reserved at least 1 hour in advance. Too late to book for today.");
+
+      if (currentHour >= 18) {
+        // After 6 PM
+        setError(
+          "Seats must be reserved at least 1 hour in advance. Too late to book for today."
+        );
         setOpenSnackbar(true);
         return false;
       }
     }
 
     // Check if intern already has a reservation for the selected date
-    const existingReservation = currentReservations.find(reservation => {
+    const existingReservation = currentReservations.find((reservation) => {
       const reservationDate = new Date(reservation.date);
       reservationDate.setHours(0, 0, 0, 0);
       return reservationDate.getTime() === selectedDateObj.getTime();
     });
 
     if (existingReservation) {
-      setError("An intern can only reserve one seat per day. You already have a reservation for this date.");
+      setError(
+        "An intern can only reserve one seat per day. You already have a reservation for this date."
+      );
       setOpenSnackbar(true);
       return false;
     }
@@ -199,9 +216,9 @@ const InternDashboard = () => {
       if (response.ok) {
         const data = await response.json();
         // Add isAvailable property based on seat status
-        const seatsWithAvailability = data.map(seat => ({
+        const seatsWithAvailability = data.map((seat) => ({
           ...seat,
-          isAvailable: seat.status === "Available"
+          isAvailable: seat.status === "Available",
         }));
         setSeats(seatsWithAvailability);
         setFilteredSeats(seatsWithAvailability);
@@ -260,9 +277,9 @@ const InternDashboard = () => {
       if (response.ok) {
         const data = await response.json();
         // Add isAvailable property based on seat status
-        const seatsWithAvailability = data.map(seat => ({
+        const seatsWithAvailability = data.map((seat) => ({
           ...seat,
-          isAvailable: seat.status === "Available"
+          isAvailable: seat.status === "Available",
         }));
         setFilteredSeats(seatsWithAvailability);
         setSelectedSeat(null);
@@ -316,7 +333,9 @@ const InternDashboard = () => {
         fetchSeats();
         fetchReservations();
       } else {
-        setError(responseData.message || responseData.error || "Booking failed");
+        setError(
+          responseData.message || responseData.error || "Booking failed"
+        );
         setSuccess("");
         setOpenSnackbar(true);
       }
@@ -392,7 +411,7 @@ const InternDashboard = () => {
         <Toolbar>
           <EventSeat sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Seat Reservation System
+            Intern Dashboard
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
             <PersonOutline sx={{ mr: 1 }} />
@@ -503,9 +522,7 @@ const InternDashboard = () => {
                         size="large"
                         onClick={handleBooking}
                         disabled={
-                          !selectedSeat ||
-                          !selectedDate ||
-                          bookingLoading
+                          !selectedSeat || !selectedDate || bookingLoading
                         }
                         startIcon={
                           bookingLoading ? (
@@ -514,9 +531,16 @@ const InternDashboard = () => {
                             <EventSeat />
                           )
                         }
-                        sx={{ py: 1.75, fontSize: "1.1rem", fontWeight: "bold", height: "56px" }}
+                        sx={{
+                          py: 1.75,
+                          fontSize: "1.1rem",
+                          fontWeight: "bold",
+                          height: "56px",
+                        }}
                       >
-                        {bookingLoading ? "Booking..." : "Book This Seat for Full Day"}
+                        {bookingLoading
+                          ? "Booking..."
+                          : "Book This Seat for Full Day"}
                       </Button>
                     </Grid>
                   </Grid>
@@ -609,21 +633,46 @@ const InternDashboard = () => {
                       Please select a date to see available seats.
                     </Alert>
                   ) : (
-                    <Grid container spacing={2}>
-                      {filteredSeats.map((seat) => (
-                        <Grid item key={seat._id}>
-                          <SeatButton
-                            onClick={() => setSelectedSeat(seat)}
-                            disabled={!seat.isAvailable}
-                            selected={selectedSeat?._id === seat._id}
-                            available={seat.isAvailable}
-                            size="large"
-                          >
-                            {seat.seatNumber}
-                          </SeatButton>
-                        </Grid>
-                      ))}
-                    </Grid>
+                    <Box>
+                      {Object.entries(groupSeatsByArea(filteredSeats)).map(
+                        ([area, areaSeats]) => (
+                          <Box key={area} sx={{ mb: 4 }}>
+                            <Typography
+                              variant="h6"
+                              sx={{
+                                mb: 2,
+                                color: "primary.main",
+                                fontWeight: "bold",
+                                borderBottom: 1,
+                                borderColor: "divider",
+                                pb: 1,
+                              }}
+                            >
+                              {area} ({areaSeats.length} seats)
+                            </Typography>
+                            <Grid container spacing={1}>
+                              {areaSeats
+                                .sort((a, b) =>
+                                  a.seatNumber.localeCompare(b.seatNumber)
+                                )
+                                .map((seat) => (
+                                  <Grid item key={seat._id}>
+                                    <SeatButton
+                                      onClick={() => setSelectedSeat(seat)}
+                                      disabled={!seat.isAvailable}
+                                      selected={selectedSeat?._id === seat._id}
+                                      available={seat.isAvailable}
+                                      size="large"
+                                    >
+                                      {seat.seatNumber}
+                                    </SeatButton>
+                                  </Grid>
+                                ))}
+                            </Grid>
+                          </Box>
+                        )
+                      )}
+                    </Box>
                   )}
                 </CardContent>
               </Card>
@@ -666,7 +715,7 @@ const InternDashboard = () => {
                           <strong>Seat</strong>
                         </TableCell>
                         <TableCell>
-                          <strong>Area</strong>
+                          <strong>Floor</strong>
                         </TableCell>
                         <TableCell>
                           <strong>Date</strong>
@@ -687,12 +736,12 @@ const InternDashboard = () => {
                         <TableRow key={reservation._id} hover>
                           <TableCell>
                             <Typography variant="body2" fontWeight="bold">
-                              {reservation.seatId.seatNumber}
+                              {reservation.seatId?.seatNumber || "N/A"}
                             </Typography>
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={reservation.seatId.area}
+                              label={reservation.seatId?.area || "Unknown"}
                               variant="outlined"
                               size="small"
                             />
@@ -781,7 +830,7 @@ const InternDashboard = () => {
                           <strong>Seat</strong>
                         </TableCell>
                         <TableCell>
-                          <strong>Area</strong>
+                          <strong>Floor</strong>
                         </TableCell>
                         <TableCell>
                           <strong>Date</strong>
@@ -799,12 +848,12 @@ const InternDashboard = () => {
                         <TableRow key={reservation._id} hover>
                           <TableCell>
                             <Typography variant="body2" fontWeight="bold">
-                              {reservation.seatId.seatNumber}
+                              {reservation.seatId?.seatNumber || "N/A"}
                             </Typography>
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={reservation.seatId.area}
+                              label={reservation.seatId?.area || "Unknown"}
                               variant="outlined"
                               size="small"
                             />

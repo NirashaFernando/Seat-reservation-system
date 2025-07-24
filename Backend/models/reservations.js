@@ -20,6 +20,11 @@ const ReservationSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
+        "9:00 AM - 12:00 PM",
+        "12:00 PM - 3:00 PM",
+        "3:00 PM - 6:00 PM",
+        "Full Day (9:00 AM - 6:00 PM)",
+        // Keep old formats for backward compatibility
         "09:00-10:00",
         "10:00-11:00",
         "11:00-12:00",
