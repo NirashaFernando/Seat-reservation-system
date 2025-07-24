@@ -8,18 +8,22 @@ const auth = require("../middleware/auth");
 const validateReservationTime = (date, timeSlot) => {
   const reservationDate = new Date(date);
   const now = new Date();
-  
-  // Reset time to start of day for date comparison
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const reservationStart = new Date(reservationDate.getFullYear(), reservationDate.getMonth(), reservationDate.getDate());
 
-  // Check if date is in the past
-  if (reservationStart < todayStart) {
+  // Normalize dates to compare only date part (ignore time)
+  const reservationDateOnly = new Date(
+    reservationDate.getFullYear(),
+    reservationDate.getMonth(),
+    reservationDate.getDate()
+  );
+  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Check if date is in the past (before today)
+  if (reservationDateOnly < todayOnly) {
     return { valid: false, message: "Cannot book past dates" };
   }
 
-  // Check if reservation is at least 1 hour in advance (only for today's bookings)
-  if (reservationStart.getTime() === todayStart.getTime()) {
+  // For today's bookings, check if reservation is at least 1 hour in advance
+  if (reservationDateOnly.getTime() === todayOnly.getTime()) {
     const [startTime] = timeSlot.split("-");
     const [hours, minutes] = startTime.split(":");
     const reservationDateTime = new Date(reservationDate);
@@ -30,7 +34,7 @@ const validateReservationTime = (date, timeSlot) => {
     if (reservationDateTime <= oneHourFromNow) {
       return {
         valid: false,
-        message: "Seats must be reserved at least 1 hour in advance",
+        message: "Seats must be reserved at least 1 hour in advance for today",
       };
     }
   }
@@ -43,9 +47,18 @@ router.post("/", auth, async (req, res) => {
   const { seatId, date, timeSlot } = req.body;
   const userId = req.user.id;
 
+  console.log("Reservation request:", {
+    userId,
+    seatId,
+    date,
+    timeSlot,
+    userRole: req.user.role,
+  });
+
   try {
     // Validate input
     if (!seatId || !date || !timeSlot) {
+      console.log("Missing required fields");
       return res
         .status(400)
         .json({ error: "Seat ID, date, and time slot are required" });
@@ -54,6 +67,7 @@ router.post("/", auth, async (req, res) => {
     // Validate reservation time
     const timeValidation = validateReservationTime(date, timeSlot);
     if (!timeValidation.valid) {
+      console.log("Time validation failed:", timeValidation.message);
       return res.status(400).json({ error: timeValidation.message });
     }
 
@@ -65,6 +79,10 @@ router.post("/", auth, async (req, res) => {
     });
 
     if (existingReservation) {
+      console.log(
+        "User already has reservation for this date:",
+        existingReservation
+      );
       return res
         .status(400)
         .json({ error: "An intern can only reserve one seat per day" });
@@ -73,10 +91,13 @@ router.post("/", auth, async (req, res) => {
     // Check if seat exists and is available
     const seat = await Seat.findById(seatId);
     if (!seat) {
+      console.log("Seat not found:", seatId);
       return res.status(404).json({ error: "Seat not found" });
     }
 
+    console.log("Seat details:", seat);
     if (seat.status !== "Available") {
+      console.log("Seat not available, status:", seat.status);
       return res.status(400).json({ error: "Seat not available" });
     }
 
@@ -89,6 +110,7 @@ router.post("/", auth, async (req, res) => {
     });
 
     if (seatBooking) {
+      console.log("Seat already booked:", seatBooking);
       return res
         .status(400)
         .json({ error: "Seat is already booked for this time slot" });
@@ -103,16 +125,21 @@ router.post("/", auth, async (req, res) => {
       status: "Active",
     });
 
+    console.log("Reservation created successfully:", reservation);
+
     // Populate the reservation with user and seat details
     const populatedReservation = await Reservation.findById(reservation._id)
       .populate("userId", "name email")
       .populate("seatId", "seatNumber row location area");
+
+    console.log("Populated reservation:", populatedReservation);
 
     res.status(201).json({
       message: "Reservation created successfully",
       reservation: populatedReservation,
     });
   } catch (err) {
+    console.error("Reservation creation error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -121,6 +148,41 @@ router.post("/", auth, async (req, res) => {
 router.get("/my", auth, async (req, res) => {
   try {
     const reservations = await Reservation.find({ userId: req.user.id })
+      .populate("seatId", "seatNumber row location area")
+      .sort({ date: -1, timeSlot: 1 });
+
+    res.json(reservations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get User's Current Reservations (future dates)
+router.get("/my/current", auth, async (req, res) => {
+  try {
+    const now = new Date();
+    const reservations = await Reservation.find({
+      userId: req.user.id,
+      date: { $gte: now },
+      status: "Active",
+    })
+      .populate("seatId", "seatNumber row location area")
+      .sort({ date: 1, timeSlot: 1 });
+
+    res.json(reservations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get User's Past Reservations
+router.get("/my/past", auth, async (req, res) => {
+  try {
+    const now = new Date();
+    const reservations = await Reservation.find({
+      userId: req.user.id,
+      $or: [{ date: { $lt: now } }, { status: "Cancelled" }],
+    })
       .populate("seatId", "seatNumber row location area")
       .sort({ date: -1, timeSlot: 1 });
 
@@ -144,6 +206,94 @@ router.get("/all", auth, async (req, res) => {
       .sort({ date: -1, timeSlot: 1 });
 
     res.json(reservations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update/Modify Reservation
+router.put("/:id", auth, async (req, res) => {
+  try {
+    const { date, timeSlot, seatId } = req.body;
+    const reservationId = req.params.id;
+    const userId = req.user.id;
+
+    // Find the existing reservation
+    const existingReservation = await Reservation.findById(reservationId);
+    if (!existingReservation) {
+      return res.status(404).json({ error: "Reservation not found" });
+    }
+
+    // Check if the reservation belongs to the user (or is admin)
+    if (
+      existingReservation.userId.toString() !== userId &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Validate that the reservation is in the future
+    if (new Date(existingReservation.date) <= new Date()) {
+      return res.status(400).json({ error: "Cannot modify past reservations" });
+    }
+
+    // Prepare update data
+    const updateData = {};
+
+    if (date) {
+      // Validate new date
+      const newDate = new Date(date);
+      if (newDate <= new Date()) {
+        return res.status(400).json({ error: "Cannot book past dates" });
+      }
+      updateData.date = newDate;
+    }
+
+    if (timeSlot) {
+      updateData.timeSlot = timeSlot;
+    }
+
+    if (seatId) {
+      // Check if new seat exists and is available
+      const seat = await Seat.findById(seatId);
+      if (!seat) {
+        return res.status(404).json({ error: "Seat not found" });
+      }
+      if (seat.status !== "Available") {
+        return res.status(400).json({ error: "Seat not available" });
+      }
+
+      // Check if seat is already booked for the target date/time
+      const conflictingReservation = await Reservation.findOne({
+        seatId,
+        date: updateData.date || existingReservation.date,
+        timeSlot: updateData.timeSlot || existingReservation.timeSlot,
+        status: "Active",
+        _id: { $ne: reservationId }, // Exclude current reservation
+      });
+
+      if (conflictingReservation) {
+        return res
+          .status(400)
+          .json({ error: "Seat is already booked for this time slot" });
+      }
+
+      updateData.seatId = seatId;
+    }
+
+    // Update the reservation
+    const updatedReservation = await Reservation.findByIdAndUpdate(
+      reservationId,
+      updateData,
+      { new: true }
+    )
+      .populate("userId", "name email")
+      .populate("seatId", "seatNumber row location area");
+
+    res.json({
+      message: "Reservation updated successfully",
+      reservation: updatedReservation,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -208,59 +358,6 @@ router.get("/available-slots/:seatId/:date", auth, async (req, res) => {
     );
 
     res.json({ availableSlots });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get Current Reservations (future and today)
-router.get("/current", auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const reservations = await Reservation.find({
-      userId,
-      status: "Active",
-      date: { $gte: todayStart }
-    })
-      .populate("seatId", "seatNumber area location")
-      .sort({ date: 1, timeSlot: 1 });
-
-    // Transform the data to match frontend expectations
-    const transformedReservations = reservations.map(reservation => ({
-      ...reservation.toObject(),
-      seat: reservation.seatId
-    }));
-
-    res.json(transformedReservations);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get Past Reservations
-router.get("/past", auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const reservations = await Reservation.find({
-      userId,
-      date: { $lt: todayStart }
-    })
-      .populate("seatId", "seatNumber area location")
-      .sort({ date: -1, timeSlot: -1 });
-
-    // Transform the data to match frontend expectations
-    const transformedReservations = reservations.map(reservation => ({
-      ...reservation.toObject(),
-      seat: reservation.seatId
-    }));
-
-    res.json(transformedReservations);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

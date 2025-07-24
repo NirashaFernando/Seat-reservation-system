@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Seat = require("../models/seat");
+const Reservation = require("../models/reservations");
 const auth = require("../middleware/auth");
 
 // Admin middleware
@@ -42,7 +43,38 @@ router.post("/", auth, adminOnly, async (req, res) => {
 // Get All Seats
 router.get("/", auth, async (req, res) => {
   try {
-    const seats = await Seat.find().sort({ row: 1, seatNumber: 1 });
+    const { date, timeSlot } = req.query;
+
+    // Get all seats
+    let seats = await Seat.find().sort({ area: 1, seatNumber: 1 }).lean();
+
+    // If date is provided, check availability
+    if (date) {
+      let reservationQuery = {
+        date: new Date(date),
+        status: "Active",
+      };
+
+      // If timeSlot is also provided, filter by specific time slot
+      if (timeSlot) {
+        reservationQuery.timeSlot = timeSlot;
+      }
+
+      const reservations = await Reservation.find(reservationQuery).select(
+        "seatId"
+      );
+
+      const reservedSeatIds = reservations.map((r) => r.seatId.toString());
+
+      // Mark seats as unavailable if they're reserved
+      seats = seats.map((seat) => ({
+        ...seat,
+        status: reservedSeatIds.includes(seat._id.toString())
+          ? "Unavailable"
+          : seat.status,
+      }));
+    }
+
     res.json(seats);
   } catch (err) {
     res.status(500).json({ error: err.message });

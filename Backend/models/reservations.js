@@ -29,6 +29,7 @@ const ReservationSchema = new mongoose.Schema(
         "15:00-16:00",
         "16:00-17:00",
         "17:00-18:00",
+        "09:00-18:00", // Full day reservation
       ],
     },
     status: {

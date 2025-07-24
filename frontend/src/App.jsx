@@ -4,6 +4,7 @@ import AdminAuth from "./components/admin/AdminAuth";
 import InternAuth from "./components/intern/InternAuth";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import InternDashboard from "./components/intern/InternDashboard";
+
 import "./App.css";
 
 function App() {

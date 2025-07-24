@@ -46,8 +46,8 @@ export const authAPI = {
 export const seatsAPI = {
   getAll: (date, timeSlot) => {
     const params = new URLSearchParams();
-    if (date) params.append('date', date);
-    if (timeSlot) params.append('timeSlot', timeSlot);
+    if (date) params.append("date", date);
+    if (timeSlot) params.append("timeSlot", timeSlot);
     return api.get(`/seats?${params.toString()}`);
   },
   getByArea: (area) => api.get(`/seats?area=${area}`),
@@ -59,8 +59,8 @@ export const seatsAPI = {
 export const reservationsAPI = {
   getAll: () => api.get("/reservations"),
   getUserReservations: () => api.get("/reservations/my"),
-  getCurrentReservations: () => api.get("/reservations/current"),
-  getPastReservations: () => api.get("/reservations/past"),
+  getCurrentReservations: () => api.get("/reservations/my/current"),
+  getPastReservations: () => api.get("/reservations/my/past"),
   create: (reservationData) => api.post("/reservations", reservationData),
   update: (id, data) => api.put(`/reservations/${id}`, data),
   cancel: (id) => api.delete(`/reservations/${id}`),
@@ -102,6 +102,11 @@ export const isAdmin = () => {
 export const isIntern = () => {
   const user = getUser();
   return user?.role === "intern";
+};
+
+export const removeToken = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
 };
 
 export default api;

@@ -1,692 +1,866 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import {
-  seatsAPI,
-  reservationsAPI,
-  authAPI,
-  getUser,
-  isAuthenticated,
-  formatDate,
-  formatTime,
-} from "../../utils/api";
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Container,
+  Tabs,
+  Tab,
+  Grid,
+  Card,
+  CardHeader,
+  CardContent,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+  Snackbar,
+  CircularProgress,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  styled,
+} from "@mui/material";
+import {
+  EventSeat,
+  PersonOutline,
+  ExitToApp,
+  AccessTime,
+  History,
+  Chair,
+  Cancel,
+  CalendarToday,
+  Schedule,
+} from "@mui/icons-material";
+import { getUser, removeToken } from "../../utils/api";
+
+// Styled Components
+const SeatButton = styled(Button)(({ theme, available, selected }) => ({
+  minWidth: 40,
+  width: 40,
+  height: 40,
+  fontSize: "0.75rem",
+  fontWeight: "bold",
+  borderRadius: theme.spacing(0.5),
+  border: `2px solid`,
+  borderColor: selected
+    ? theme.palette.primary.main
+    : available
+    ? theme.palette.success.main
+    : theme.palette.error.main,
+  backgroundColor: selected
+    ? theme.palette.primary.light
+    : available
+    ? theme.palette.success.light
+    : theme.palette.error.light,
+  color: selected
+    ? theme.palette.primary.dark
+    : available
+    ? theme.palette.success.dark
+    : theme.palette.error.dark,
+  "&:hover": {
+    backgroundColor: selected
+      ? theme.palette.primary.main
+      : available
+      ? theme.palette.success.main
+      : theme.palette.error.light,
+  },
+  "&:disabled": {
+    cursor: "not-allowed",
+    opacity: 0.6,
+  },
+}));
+
+// TabPanel Component
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 const InternDashboard = () => {
   const [activeTab, setActiveTab] = useState("book");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedSeat, setSelectedSeat] = useState(null);
   const [seats, setSeats] = useState([]);
-  const [myReservations, setMyReservations] = useState([]);
+  const [filteredSeats, setFilteredSeats] = useState([]);
   const [currentReservations, setCurrentReservations] = useState([]);
   const [pastReservations, setPastReservations] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  });
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
-  const [selectedSeat, setSelectedSeat] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [notification, setNotification] = useState(null); // For popup notifications
-  const navigate = useNavigate();
+  const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  const timeSlots = [
-    "09:00-10:00",
-    "10:00-11:00",
-    "11:00-12:00",
-    "12:00-13:00",
-    "13:00-14:00",
-    "14:00-15:00",
-    "15:00-16:00",
-    "16:00-17:00",
-  ];
-
-  useEffect(() => {
-    const user = getUser();
-    if (!isAuthenticated() || user?.role !== "intern") {
-      navigate("/");
-      return;
+  // Validation functions
+  const validateBooking = () => {
+    // Check if date is selected
+    if (!selectedDate) {
+      setError("Please select a date");
+      setOpenSnackbar(true);
+      return false;
     }
-    fetchData();
-  }, [navigate]);
 
-  // Auto-hide notifications after 5 seconds
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 5000);
-      return () => clearTimeout(timer);
+    // Check if seat is selected
+    if (!selectedSeat) {
+      setError("Please select a seat");
+      setOpenSnackbar(true);
+      return false;
     }
-  }, [notification]);
 
-  // Update seat availability when date or time slot changes
-  useEffect(() => {
-    if (selectedDate && selectedTimeSlot && seats.length > 0) {
-      updateSeatAvailability();
+    // Check if past date
+    const selectedDateObj = new Date(selectedDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDateObj.setHours(0, 0, 0, 0);
+
+    if (selectedDateObj < today) {
+      setError("Past dates cannot be booked");
+      setOpenSnackbar(true);
+      return false;
     }
-  }, [selectedDate, selectedTimeSlot, currentReservations]);
 
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
-  };
+    // Check if at least 1 hour in advance for today
+    if (selectedDateObj.getTime() === today.getTime()) {
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      const currentHour = oneHourFromNow.getHours();
+      
+      if (currentHour >= 18) { // After 6 PM
+        setError("Seats must be reserved at least 1 hour in advance. Too late to book for today.");
+        setOpenSnackbar(true);
+        return false;
+      }
+    }
 
-  const updateSeatAvailability = () => {
-    const updatedSeats = seats.map(seat => {
-      // Check if this seat is reserved for the selected date and time slot
-      const isReserved = currentReservations.some(reservation => 
-        reservation.seat?._id === seat._id &&
-        reservation.date === selectedDate &&
-        reservation.timeSlot === selectedTimeSlot
-      );
-
-      return {
-        ...seat,
-        status: isReserved ? "reserved" : seat.originalStatus || "Available"
-      };
+    // Check if intern already has a reservation for the selected date
+    const existingReservation = currentReservations.find(reservation => {
+      const reservationDate = new Date(reservation.date);
+      reservationDate.setHours(0, 0, 0, 0);
+      return reservationDate.getTime() === selectedDateObj.getTime();
     });
 
-    setSeats(updatedSeats);
+    if (existingReservation) {
+      setError("An intern can only reserve one seat per day. You already have a reservation for this date.");
+      setOpenSnackbar(true);
+      return false;
+    }
+
+    // Check if seat is available
+    if (!selectedSeat.isAvailable) {
+      setError("This seat is already booked and cannot be reserved");
+      setOpenSnackbar(true);
+      return false;
+    }
+
+    return true;
   };
 
-  // Refresh seats when date changes
+  useEffect(() => {
+    fetchSeats();
+    fetchReservations();
+  }, []);
+
   useEffect(() => {
     if (selectedDate) {
-      const fetchSeats = async () => {
-        try {
-          // Fetch seats for the entire day when only date is selected
-          console.log("Fetching seats for date:", selectedDate);
-          const seatsRes = await seatsAPI.getAll(selectedDate, "");
-          console.log("Seats received:", seatsRes.data);
-          setSeats(seatsRes.data);
-        } catch (error) {
-          console.error("Error fetching seats:", error);
-        }
-      };
-      fetchSeats();
+      checkAvailability();
+    } else {
+      // Reset to all seats if no date selected
+      setFilteredSeats(seats);
+      setSelectedSeat(null);
     }
-  }, [selectedDate]);
+  }, [selectedDate, seats]);
 
-  // Update seat availability when time slot is selected
-  useEffect(() => {
-    if (selectedDate && selectedTimeSlot) {
-      const fetchSeatsWithTimeSlot = async () => {
-        try {
-          console.log(
-            "Fetching seats for date and time:",
-            selectedDate,
-            selectedTimeSlot
-          );
-          const seatsRes = await seatsAPI.getAll(
-            selectedDate,
-            selectedTimeSlot
-          );
-          console.log("Seats with time slot:", seatsRes.data);
-          setSeats(seatsRes.data);
-        } catch (error) {
-          console.error("Error fetching seats with time slot:", error);
-        }
-      };
-      fetchSeatsWithTimeSlot();
-    }
-  }, [selectedTimeSlot]);
-
-  const fetchData = async () => {
+  const fetchSeats = async () => {
     try {
-      setLoading(true);
-      setError(""); // Clear any previous errors
-      
-      const [seatsRes, reservationsRes, currentRes, pastRes] = await Promise.all([
-        seatsAPI.getAll(selectedDate, ""),
-        reservationsAPI.getUserReservations(),
-        reservationsAPI.getCurrentReservations(),
-        reservationsAPI.getPastReservations(),
-      ]);
+      const response = await fetch("http://localhost:5000/api/seats", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-      // Store original status for seat availability updates
-      const seatsWithOriginalStatus = seatsRes.data.map(seat => ({
-        ...seat,
-        originalStatus: seat.status
-      }));
-
-      setSeats(seatsWithOriginalStatus);
-      setMyReservations(reservationsRes.data);
-      setCurrentReservations(currentRes.data);
-      setPastReservations(pastRes.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      
-      // Provide more specific error messages
-      if (error.response?.status === 401) {
-        setError("Authentication failed. Please log in again.");
-        navigate("/");
-      } else if (error.response?.status === 403) {
-        setError("Access denied. You don't have permission to view this data.");
-      } else if (error.response?.status >= 500) {
-        setError("Server error. Please try again later.");
-      } else if (error.code === 'NETWORK_ERROR' || !error.response) {
-        setError("Unable to connect to server. Please check your connection and try again.");
-      } else {
-        setError(error.response?.data?.error || error.response?.data?.message || "Failed to fetch data");
+      if (response.ok) {
+        const data = await response.json();
+        // Add isAvailable property based on seat status
+        const seatsWithAvailability = data.map(seat => ({
+          ...seat,
+          isAvailable: seat.status === "Available"
+        }));
+        setSeats(seatsWithAvailability);
+        setFilteredSeats(seatsWithAvailability);
       }
+    } catch (error) {
+      console.error("Error fetching seats:", error);
+      setError("Failed to load seats");
+      setOpenSnackbar(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    authAPI.logout();
-    navigate("/");
+  const fetchReservations = async () => {
+    try {
+      const [currentRes, pastRes] = await Promise.all([
+        fetch("http://localhost:5000/api/reservations/my/current", {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }),
+        fetch("http://localhost:5000/api/reservations/my/past", {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }),
+      ]);
+
+      if (currentRes.ok) {
+        const currentData = await currentRes.json();
+        setCurrentReservations(currentData);
+      }
+
+      if (pastRes.ok) {
+        const pastData = await pastRes.json();
+        setPastReservations(pastData);
+      }
+    } catch (error) {
+      console.error("Error fetching reservations:", error);
+    }
   };
 
-  const handleDateChange = (newDate) => {
-    setSelectedDate(newDate);
-    setSelectedSeat(null); // Clear seat selection when date changes
-    setSelectedTimeSlot(""); // Clear time slot when date changes
-  };
+  const checkAvailability = async () => {
+    if (!selectedDate) return;
 
-  const handleTimeSlotChange = (newTimeSlot) => {
-    setSelectedTimeSlot(newTimeSlot);
-    setSelectedSeat(null); // Clear seat selection when time slot changes
-  };
+    try {
+      const params = new URLSearchParams({
+        date: selectedDate,
+      });
 
-  const handleSeatSelection = (seat) => {
-    if (seat.status === "Available") {
-      setSelectedSeat(seat);
+      const response = await fetch(
+        `http://localhost:5000/api/seats?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        // Add isAvailable property based on seat status
+        const seatsWithAvailability = data.map(seat => ({
+          ...seat,
+          isAvailable: seat.status === "Available"
+        }));
+        setFilteredSeats(seatsWithAvailability);
+        setSelectedSeat(null);
+      } else {
+        setError("Failed to check availability");
+        setOpenSnackbar(true);
+      }
+    } catch (error) {
+      console.error("Error checking availability:", error);
+      setError("Failed to check availability");
+      setOpenSnackbar(true);
     }
   };
 
   const handleBooking = async () => {
-    if (!selectedSeat || !selectedDate || !selectedTimeSlot) {
-      showNotification("Please select a seat, date, and time slot", "error");
+    // Validate booking rules
+    if (!validateBooking()) {
       return;
     }
 
-    // Debug logging
-    console.log("Booking attempt:", {
-      seatId: selectedSeat._id,
-      seatNumber: selectedSeat.seatNumber,
-      date: selectedDate,
-      timeSlot: selectedTimeSlot,
-      dateObject: new Date(selectedDate),
-      now: new Date(),
-    });
-
+    setBookingLoading(true);
     try {
-      setBookingLoading(true);
-      setError("");
-
-      const response = await reservationsAPI.create({
+      console.log("Booking request:", {
         seatId: selectedSeat._id,
         date: selectedDate,
-        timeSlot: selectedTimeSlot,
+        timeSlot: "09:00-18:00", // Full day booking
       });
 
-      console.log("Booking response:", response.data);
-      showNotification(`Seat ${selectedSeat.seatNumber} booked successfully!`, "success");
-      setSelectedSeat(null);
-      setSelectedDate(() => {
-        const today = new Date();
-        return today.toISOString().split("T")[0];
+      const response = await fetch("http://localhost:5000/api/reservations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          seatId: selectedSeat._id,
+          date: selectedDate,
+          timeSlot: "09:00-18:00", // Full day reservation
+        }),
       });
-      setSelectedTimeSlot("");
-      fetchData(); // Refresh data
+
+      const responseData = await response.json();
+      console.log("Booking response:", responseData);
+
+      if (response.ok) {
+        setSuccess("Seat booked successfully for the entire day!");
+        setError("");
+        setOpenSnackbar(true);
+        setSelectedSeat(null);
+        setSelectedDate("");
+        fetchSeats();
+        fetchReservations();
+      } else {
+        setError(responseData.message || responseData.error || "Booking failed");
+        setSuccess("");
+        setOpenSnackbar(true);
+      }
     } catch (error) {
-      console.error("Booking error:", error);
-      console.error("Error response:", error.response?.data);
-      const errorMessage = error.response?.data?.error ||
-          error.response?.data?.message ||
-          "Failed to book seat";
-      showNotification(errorMessage, "error");
+      console.error("Error booking seat:", error);
+      setError("Booking failed. Please try again.");
+      setSuccess("");
+      setOpenSnackbar(true);
     } finally {
       setBookingLoading(false);
     }
   };
 
   const handleCancelReservation = async (reservationId) => {
-    if (!window.confirm("Are you sure you want to cancel this reservation?")) {
-      return;
-    }
-
     try {
-      await reservationsAPI.cancel(reservationId);
-      showNotification("Reservation cancelled successfully!", "success");
-      fetchData(); // Refresh data
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || "Failed to cancel reservation";
-      showNotification(errorMessage, "error");
-    }
-  };
+      const response = await fetch(
+        `http://localhost:5000/api/reservations/${reservationId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
 
-  const getSeatColor = (seat) => {
-    // Selected seat
-    if (selectedSeat?._id === seat._id) {
-      return "bg-blue-100 border-blue-400 text-blue-800 ring-2 ring-blue-300 shadow-md";
-    }
-
-    // Check seat status
-    if (
-      seat.status === "Unavailable" ||
-      seat.status === "occupied" ||
-      seat.status === "reserved"
-    ) {
-      return "bg-red-50 border-red-300 text-red-700 cursor-not-allowed opacity-70";
-    }
-
-    if (seat.status === "Available") {
-      return "bg-green-50 border-green-300 text-green-800 hover:bg-green-100 hover:border-green-400 cursor-pointer shadow-sm hover:shadow-md";
-    }
-
-    // Default for other statuses
-    return "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed opacity-70";
-  };
-
-  const groupSeatsByArea = (seats) => {
-    return seats.reduce((groups, seat) => {
-      const area = seat.area;
-      if (!groups[area]) {
-        groups[area] = [];
+      if (response.ok) {
+        setSuccess("Reservation cancelled successfully!");
+        setError("");
+        setOpenSnackbar(true);
+        fetchReservations();
+        fetchSeats();
+      } else {
+        setError("Failed to cancel reservation");
+        setSuccess("");
+        setOpenSnackbar(true);
       }
-      groups[area].push(seat);
-      return groups;
-    }, {});
+    } catch (error) {
+      console.error("Error cancelling reservation:", error);
+      setError("Failed to cancel reservation");
+      setSuccess("");
+      setOpenSnackbar(true);
+    }
+  };
+
+  const handleLogout = () => {
+    removeToken();
+    window.location.href = "/";
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+        flexDirection="column"
+      >
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ mt: 2, color: "text.secondary" }}>
+          Loading dashboard...
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Popup Notification */}
-      {notification && (
-        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right duration-300">
-          <div className={`max-w-sm p-4 rounded-lg shadow-lg border-l-4 ${
-            notification.type === 'success'
-              ? 'bg-green-50 border-green-400 text-green-800'
-              : 'bg-red-50 border-red-400 text-red-800'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  {notification.type === 'success' ? (
-                    <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium">{notification.message}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setNotification(null)}
-                className="ml-4 text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top Navigation Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Seat Reservation System
-              </h1>
-              <p className="text-sm text-gray-600">
-                Welcome, <span className="font-medium">{getUser()?.name}</span>
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-500">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <Box
+      sx={{ flexGrow: 1, bgcolor: "background.default", minHeight: "100vh" }}
+    >
+      {/* App Bar */}
+      <AppBar position="static" elevation={2}>
+        <Toolbar>
+          <EventSeat sx={{ mr: 2 }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Seat Reservation System
+          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+            <PersonOutline sx={{ mr: 1 }} />
+            <Typography variant="body2">Welcome, {getUser()?.name}</Typography>
+          </Box>
+          <Button
+            color="inherit"
+            onClick={handleLogout}
+            startIcon={<ExitToApp />}
+            variant="outlined"
+            sx={{ borderColor: "rgba(255,255,255,0.5)" }}
+          >
+            Sign Out
+          </Button>
+        </Toolbar>
+      </AppBar>
 
       {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6">
-          <nav className="flex space-x-8">
-            {[
-              { id: "book", name: "Book Seat" },
-              { id: "current", name: "Current Reservations" },
-              { id: "past", name: "Past Reservations" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
+      <Box
+        sx={{
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Container maxWidth="xl">
+          <Tabs
+            value={activeTab}
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            aria-label="dashboard tabs"
+            sx={{ minHeight: 64 }}
+          >
+            <Tab
+              label="Book Seat"
+              value="book"
+              icon={<EventSeat />}
+              iconPosition="start"
+              sx={{ minHeight: 64, fontSize: "1rem" }}
+            />
+            <Tab
+              label="Current Reservations"
+              value="current"
+              icon={<AccessTime />}
+              iconPosition="start"
+              sx={{ minHeight: 64, fontSize: "1rem" }}
+            />
+            <Tab
+              label="Past Reservations"
+              value="past"
+              icon={<History />}
+              iconPosition="start"
+              sx={{ minHeight: 64, fontSize: "1rem" }}
+            />
+          </Tabs>
+        </Container>
+      </Box>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={openSnackbar}
+          autoHideDuration={6000}
+          onClose={() => setOpenSnackbar(false)}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setOpenSnackbar(false)}
+            severity={error ? "error" : "success"}
+            variant="filled"
+          >
+            {error || success}
+          </Alert>
+        </Snackbar>
+
         {/* Book Seat Tab */}
-        {activeTab === "book" && (
-          <div className="space-y-6">
+        <TabPanel value={activeTab} index="book">
+          <Grid container spacing={3}>
             {/* Booking Form */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                Book a Seat
-              </h3>
+            <Grid item xs={12}>
+              <Card elevation={2}>
+                <CardHeader
+                  title="Book a Seat"
+                  avatar={<EventSeat color="primary" />}
+                  titleTypographyProps={{ variant: "h5", fontWeight: "bold" }}
+                />
+                <CardContent>
+                  <Grid container spacing={3} sx={{ mb: 3 }}>
+                    <Grid item xs={12} md={8}>
+                      <TextField
+                        fullWidth
+                        label="Select Date"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        inputProps={{
+                          min: new Date().toISOString().split("T")[0],
+                        }}
+                        variant="outlined"
+                        helperText="Select a date to book a seat for the entire day"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        size="large"
+                        onClick={handleBooking}
+                        disabled={
+                          !selectedSeat ||
+                          !selectedDate ||
+                          bookingLoading
+                        }
+                        startIcon={
+                          bookingLoading ? (
+                            <CircularProgress size={20} />
+                          ) : (
+                            <EventSeat />
+                          )
+                        }
+                        sx={{ py: 1.75, fontSize: "1.1rem", fontWeight: "bold", height: "56px" }}
+                      >
+                        {bookingLoading ? "Booking..." : "Book This Seat for Full Day"}
+                      </Button>
+                    </Grid>
+                  </Grid>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Date
-                  </label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
+                  {selectedDate && (
+                    <Alert severity="info" sx={{ mb: 3 }}>
+                      <strong>Date:</strong>{" "}
+                      {new Date(selectedDate).toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                      <br />
+                      <strong>Duration:</strong> Full Day (9:00 AM - 6:00 PM)
+                    </Alert>
+                  )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Time Slot
-                  </label>
-                  <select
-                    value={selectedTimeSlot}
-                    onChange={(e) => handleTimeSlotChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Choose time slot</option>
-                    {timeSlots.map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Selected Seat
-                  </label>
-                  <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm">
-                    {selectedSeat
-                      ? `${selectedSeat.seatNumber} (${selectedSeat.area})`
-                      : "No seat selected"}
-                  </div>
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={handleBooking}
-                    disabled={
-                      !selectedSeat ||
-                      !selectedDate ||
-                      !selectedTimeSlot ||
-                      bookingLoading
-                    }
-                    className="w-full py-2 px-4 rounded-md font-medium text-white transition-colors bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {bookingLoading ? "Booking..." : "Book Seat"}
-                  </button>
-                </div>
-              </div>
-            </div>
+                  {/* Selected Seat Info */}
+                  {selectedSeat && (
+                    <Alert severity="success" sx={{ mb: 3 }}>
+                      <strong>Selected Seat:</strong> {selectedSeat.seatNumber}{" "}
+                      ({selectedSeat.area})
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
 
             {/* Seat Map */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Select a Seat
-                </h3>
-                <div className="flex items-center space-x-6 text-sm">
-                  <div className="flex items-center">
-                    <div className="w-5 h-5 bg-green-50 border-2 border-green-300 rounded mr-2"></div>
-                    <span className="text-gray-700 font-medium">Available</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-5 h-5 bg-red-50 border-2 border-red-300 rounded mr-2"></div>
-                    <span className="text-gray-700 font-medium">
-                      Unavailable
-                    </span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-5 h-5 bg-blue-100 border-2 border-blue-400 rounded mr-2"></div>
-                    <span className="text-gray-700 font-medium">Selected</span>
-                  </div>
-                </div>
-              </div>
-
-              {Object.entries(groupSeatsByArea(seats)).map(
-                ([area, areaSeats]) => (
-                  <div key={area} className="mb-8">
-                    <div className="bg-gray-50 p-3 rounded-lg mb-4 border border-gray-200">
-                      <h4 className="text-md font-semibold text-gray-800 capitalize">
-                        {area} Area ({areaSeats.length} seats)
-                      </h4>
-                    </div>
-                    <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-14 gap-3">
-                      {areaSeats.map((seat) => (
-                        <button
-                          key={seat._id}
-                          onClick={() => handleSeatSelection(seat)}
-                          disabled={seat.status !== "Available"}
-                          className={`p-3 rounded-lg text-sm font-bold transition-all duration-200 hover:scale-105 border-2 ${getSeatColor(
-                            seat
-                          )}`}
-                          title={`Seat ${seat.seatNumber} - ${seat.status}`}
-                        >
-                          {seat.seatNumber}
-                        </button>
+            <Grid item xs={12}>
+              <Card elevation={2}>
+                <CardHeader
+                  title="Select a Seat"
+                  avatar={<Chair color="primary" />}
+                  titleTypographyProps={{ variant: "h5", fontWeight: "bold" }}
+                  action={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: "success.light",
+                            border: 1,
+                            borderColor: "success.main",
+                            borderRadius: 0.5,
+                          }}
+                        />
+                        <Typography variant="body2">Available</Typography>
+                      </Box>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: "error.light",
+                            border: 1,
+                            borderColor: "error.main",
+                            borderRadius: 0.5,
+                          }}
+                        />
+                        <Typography variant="body2">Unavailable</Typography>
+                      </Box>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: "primary.light",
+                            border: 1,
+                            borderColor: "primary.main",
+                            borderRadius: 0.5,
+                          }}
+                        />
+                        <Typography variant="body2">Selected</Typography>
+                      </Box>
+                    </Box>
+                  }
+                />
+                <CardContent>
+                  {filteredSeats.length === 0 ? (
+                    <Alert severity="warning">
+                      Please select a date to see available seats.
+                    </Alert>
+                  ) : (
+                    <Grid container spacing={2}>
+                      {filteredSeats.map((seat) => (
+                        <Grid item key={seat._id}>
+                          <SeatButton
+                            onClick={() => setSelectedSeat(seat)}
+                            disabled={!seat.isAvailable}
+                            selected={selectedSeat?._id === seat._id}
+                            available={seat.isAvailable}
+                            size="large"
+                          >
+                            {seat.seatNumber}
+                          </SeatButton>
+                        </Grid>
                       ))}
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        )}
+                    </Grid>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
 
         {/* Current Reservations Tab */}
-        {activeTab === "current" && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Current Reservations
-              </h3>
-            </div>
-            <div className="p-6">
+        <TabPanel value={activeTab} index="current">
+          <Card elevation={2}>
+            <CardHeader
+              title="Current Reservations"
+              avatar={<AccessTime color="primary" />}
+              titleTypographyProps={{ variant: "h5", fontWeight: "bold" }}
+            />
+            <CardContent>
               {currentReservations.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 mb-4">No current reservations</p>
-                  <button
+                <Box sx={{ textAlign: "center", py: 6 }}>
+                  <Typography
+                    variant="body1"
+                    color="text.secondary"
+                    sx={{ mb: 3 }}
+                  >
+                    No current reservations
+                  </Typography>
+                  <Button
+                    variant="contained"
                     onClick={() => setActiveTab("book")}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
+                    startIcon={<EventSeat />}
                   >
                     Book a Seat
-                  </button>
-                </div>
+                  </Button>
+                </Box>
               ) : (
-                <div className="space-y-4">
-                  {currentReservations.map((reservation) => (
-                    <div
-                      key={reservation._id}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow duration-200"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4 mb-3">
-                            <div>
-                              <h4 className="text-lg font-semibold text-gray-900">
-                                Seat {reservation.seat?.seatNumber}
-                              </h4>
-                              <p className="text-sm text-gray-600 capitalize">
-                                {reservation.seat?.area} Area
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium text-gray-700">
-                                Date:
-                              </span>
-                              <p className="text-gray-900">
-                                {formatDate(reservation.date)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">
-                                Time:
-                              </span>
-                              <p className="text-gray-900">
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>
+                          <strong>Seat</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Area</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Date</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Time Slot</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Status</strong>
+                        </TableCell>
+                        <TableCell align="center">
+                          <strong>Actions</strong>
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {currentReservations.map((reservation) => (
+                        <TableRow key={reservation._id} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold">
+                              {reservation.seatId.seatNumber}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={reservation.seatId.area}
+                              variant="outlined"
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <CalendarToday fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {new Date(
+                                  reservation.date
+                                ).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <Schedule fontSize="small" color="action" />
+                              <Typography variant="body2">
                                 {reservation.timeSlot}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">
-                                Status:
-                              </span>
-                              <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                {reservation.status}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {reservation.status === "Active" &&
-                          new Date(reservation.date) > new Date() && (
-                            <button
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={reservation.status}
+                              color="success"
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
                               onClick={() =>
                                 handleCancelReservation(reservation._id)
                               }
-                              className="ml-4 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors duration-200"
+                              startIcon={<Cancel />}
                             >
                               Cancel
-                            </button>
-                          )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
-            </div>
-          </div>
-        )}
+            </CardContent>
+          </Card>
+        </TabPanel>
 
         {/* Past Reservations Tab */}
-        {activeTab === "past" && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Past Reservations
-              </h3>
-            </div>
-            <div className="p-6">
+        <TabPanel value={activeTab} index="past">
+          <Card elevation={2}>
+            <CardHeader
+              title="Past Reservations"
+              avatar={<History color="primary" />}
+              titleTypographyProps={{ variant: "h5", fontWeight: "bold" }}
+            />
+            <CardContent>
               {pastReservations.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No past reservations</p>
-                </div>
+                <Box sx={{ textAlign: "center", py: 6 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No past reservations
+                  </Typography>
+                </Box>
               ) : (
-                <div className="space-y-4">
-                  {pastReservations.map((reservation) => (
-                    <div
-                      key={reservation._id}
-                      className="border border-gray-200 rounded-lg p-4 opacity-75"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4 mb-3">
-                            <div>
-                              <h4 className="text-lg font-semibold text-gray-900">
-                                Seat {reservation.seat?.seatNumber}
-                              </h4>
-                              <p className="text-sm text-gray-600 capitalize">
-                                {reservation.seat?.area} Area
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium text-gray-700">
-                                Date:
-                              </span>
-                              <p className="text-gray-900">
-                                {formatDate(reservation.date)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">
-                                Time:
-                              </span>
-                              <p className="text-gray-900">
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>
+                          <strong>Seat</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Area</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Date</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Time Slot</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Status</strong>
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pastReservations.map((reservation) => (
+                        <TableRow key={reservation._id} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold">
+                              {reservation.seatId.seatNumber}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={reservation.seatId.area}
+                              variant="outlined"
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <CalendarToday fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {new Date(
+                                  reservation.date
+                                ).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <Schedule fontSize="small" color="action" />
+                              <Typography variant="body2">
                                 {reservation.timeSlot}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">
-                                Status:
-                              </span>
-                              <span
-                                className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                                  reservation.status === "Active"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {reservation.status}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={reservation.status}
+                              color={
+                                reservation.status === "Completed"
+                                  ? "success"
+                                  : "default"
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+            </CardContent>
+          </Card>
+        </TabPanel>
+      </Container>
+    </Box>
   );
 };
 
