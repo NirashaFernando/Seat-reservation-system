@@ -24,16 +24,16 @@ import {
 import { getUser } from "../../utils/api";
 
 // Import components
-import TabPanel from "../admin/components/TabPanel";
-import OverviewTab from "../admin/components/OverviewTab";
-import SeatManagementTab from "../admin/components/SeatManagementTab";
-import ReservationsTab from "../admin/components/ReservationsTab";
-import ManualAssignmentTab from "../admin/components/ManualAssignmentTab";
-import ReportsTab from "../admin/components/ReportsTab";
-import AdminDialogs from "../admin/components/AdminDialogs";
+import TabPanel from "./components/TabPanel";
+import OverviewTab from "./components/OverviewTab";
+import SeatManagementTab from "./components/SeatManagementTab";
+import ReservationsTab from "./components/ReservationsTab";
+import ManualAssignmentTab from "./components/ManualAssignmentTab";
+import ReportsTab from "./components/ReportsTab";
+import AdminDialogs from "./components/AdminDialogs";
 
 // Import custom hook
-import { useAdminDashboard } from "../admin/hooks/useAdminDashboard";
+import { useAdminDashboard } from "./hooks/useAdminDashboard";
 
 const AdminDashboard = () => {
   const {
